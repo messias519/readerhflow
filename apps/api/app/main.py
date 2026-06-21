@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import (
@@ -15,6 +15,7 @@ from app.auth import (
     authenticate_user,
     create_access_token,
     ensure_initial_admin,
+    get_current_admin_user,
     get_current_user,
 )
 from app.config import get_settings
@@ -58,7 +59,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -214,3 +215,24 @@ async def suwayomi_image(
     except SuwayomiClientError as exc:
         raise suwayomi_http_error(exc) from exc
     return Response(content=content, media_type=content_type)
+
+
+@app.api_route(
+    "/api/admin/suwayomi",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+@app.api_route(
+    "/api/admin/suwayomi/{path:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def admin_suwayomi_proxy(
+    request: Request,
+    _current_user: Annotated[User, Depends(get_current_admin_user)],
+    client: Annotated[SuwayomiClient, Depends(get_suwayomi_client)],
+    path: str = "",
+) -> Response:
+    del _current_user
+    try:
+        return await client.proxy_webui(request, path)
+    except SuwayomiClientError as exc:
+        raise suwayomi_http_error(exc) from exc

@@ -33,6 +33,7 @@ Implemented API endpoints:
 - `POST /api/library/external`
 - `GET /api/library`
 - `GET /api/library/{item_id}`
+- `GET|POST|PUT|PATCH|DELETE /api/admin/suwayomi/{path}`
 
 The web dashboard shows:
 
@@ -46,6 +47,7 @@ The web dashboard shows:
 - source list
 - source search
 - user library
+- protected admin access to the internal Suwayomi WebUI
 
 Not implemented yet:
 
@@ -94,6 +96,8 @@ Local Compose exposes only the web and API ports by default. PostgreSQL, Redis a
 PanelFlow uses Suwayomi as an internal manga/manhwa source engine. The browser never talks to Suwayomi directly; Next.js calls the PanelFlow API, and the API calls Suwayomi through `SUWAYOMI_URL` inside Docker.
 
 Source browsing and search use Suwayomi's GraphQL API. Results added to the PanelFlow library are stored in PostgreSQL with `source_type=external_suwayomi`, and duplicate saves are prevented per user by `source_id + external_id`.
+
+Admins can open `/admin/suwayomi` to access Suwayomi's WebUI through a protected PanelFlow proxy. Suwayomi is still not exposed directly to the public internet.
 
 See [Suwayomi integration](docs/SUWAYOMI_INTEGRATION.md).
 

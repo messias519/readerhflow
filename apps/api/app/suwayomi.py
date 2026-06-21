@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
 import httpx
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel
 
 from app.config import Settings, get_settings
@@ -246,6 +247,38 @@ class SuwayomiClient:
         content_type = response.headers.get("content-type", "application/octet-stream")
         return response.content, content_type
 
+    async def proxy_webui(self, request: Request, path: str = "") -> Response:
+        target_url = self._proxy_target(path, str(request.url.query))
+        headers = self._proxy_request_headers(request)
+        content = await request.body()
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=False) as client:
+                upstream = await client.request(
+                    request.method,
+                    target_url,
+                    content=content if content else None,
+                    headers=headers,
+                )
+        except httpx.RequestError as exc:
+            raise SuwayomiClientError(
+                "suwayomi_unavailable",
+                "Suwayomi WebUI is not reachable from the PanelFlow API.",
+            ) from exc
+
+        response_headers = self._proxy_response_headers(upstream)
+        body = upstream.content
+        content_type = upstream.headers.get("content-type", "")
+
+        if "text/html" in content_type.lower():
+            body = self._rewrite_html(body, upstream.encoding or "utf-8")
+            response_headers["content-length"] = str(len(body))
+        elif "text/css" in content_type.lower():
+            body = self._rewrite_css(body, upstream.encoding or "utf-8")
+            response_headers["content-length"] = str(len(body))
+
+        return Response(content=body, status_code=upstream.status_code, headers=response_headers)
+
     def _source_summary(self, node: dict[str, Any]) -> SourceSummary:
         extension = node.get("extension") if isinstance(node.get("extension"), dict) else {}
         status_text = "installed"
@@ -282,6 +315,131 @@ class SuwayomiClient:
             description=manga.get("description"),
             status=manga.get("status"),
         )
+
+    def _proxy_target(self, path: str, query: str) -> str:
+        clean_path = path.lstrip("/")
+        target = urljoin(f"{self.base_url}/", clean_path)
+        parsed_base = urlparse(self.base_url)
+        parsed_target = urlparse(target)
+        if parsed_target.scheme != parsed_base.scheme or parsed_target.netloc != parsed_base.netloc:
+            raise SuwayomiClientError("invalid_proxy_path", "Invalid Suwayomi proxy path.", 400)
+        if query:
+            return f"{target}?{query}"
+        return target
+
+    def _proxy_request_headers(self, request: Request) -> dict[str, str]:
+        blocked = {
+            "host",
+            "connection",
+            "keep-alive",
+            "proxy-authenticate",
+            "proxy-authorization",
+            "te",
+            "trailer",
+            "transfer-encoding",
+            "upgrade",
+            "authorization",
+            "content-length",
+        }
+        headers: dict[str, str] = {}
+        for name, value in request.headers.items():
+            lower_name = name.lower()
+            if lower_name in blocked:
+                continue
+            if lower_name.startswith("x-forwarded-"):
+                continue
+            headers[name] = value
+        headers["x-forwarded-prefix"] = "/api/admin/suwayomi"
+        return headers
+
+    def _proxy_response_headers(self, upstream: httpx.Response) -> dict[str, str]:
+        blocked = {
+            "connection",
+            "keep-alive",
+            "proxy-authenticate",
+            "proxy-authorization",
+            "te",
+            "trailer",
+            "transfer-encoding",
+            "upgrade",
+            "content-encoding",
+            "content-length",
+            "x-frame-options",
+            "content-security-policy",
+        }
+        headers: dict[str, str] = {}
+        for name, value in upstream.headers.items():
+            lower_name = name.lower()
+            if lower_name in blocked:
+                continue
+            if lower_name == "location":
+                headers[name] = self._rewrite_location(value)
+                continue
+            headers[name] = value
+        headers.setdefault("cache-control", "no-store")
+        return headers
+
+    def _rewrite_location(self, location: str) -> str:
+        parsed_location = urlparse(location)
+        parsed_base = urlparse(self.base_url)
+        if not parsed_location.netloc and location.startswith("/"):
+            return f"/api/admin/suwayomi{location}"
+        if parsed_location.scheme == parsed_base.scheme and parsed_location.netloc == parsed_base.netloc:
+            path = parsed_location.path or "/"
+            query = f"?{parsed_location.query}" if parsed_location.query else ""
+            fragment = f"#{parsed_location.fragment}" if parsed_location.fragment else ""
+            return f"/api/admin/suwayomi{path}{query}{fragment}"
+        return location
+
+    def _rewrite_html(self, body: bytes, encoding: str) -> bytes:
+        text = body.decode(encoding, errors="replace")
+        text = re.sub(r'((?:href|src|action)=["\'])/(?!/|api/admin/suwayomi/)', r"\1/api/admin/suwayomi/", text)
+        text = text.replace('url("/', 'url("/api/admin/suwayomi/')
+        text = text.replace("url('/", "url('/api/admin/suwayomi/")
+        text = re.sub(r"url\(/(?!/|api/admin/suwayomi/)", "url(/api/admin/suwayomi/", text)
+
+        shim = """
+<base href="/api/admin/suwayomi/">
+<script>
+(() => {
+  const prefix = "/api/admin/suwayomi";
+  const rewrite = (url) => {
+    if (typeof url !== "string") return url;
+    if (url === prefix || url.startsWith(prefix + "/")) return url;
+    if (url.startsWith("/")) return prefix + url;
+    try {
+      const parsed = new URL(url, window.location.origin);
+      if (parsed.origin === window.location.origin && parsed.pathname !== prefix && !parsed.pathname.startsWith(prefix + "/")) {
+        return prefix + parsed.pathname + parsed.search + parsed.hash;
+      }
+    } catch {}
+    return url;
+  };
+  const originalFetch = window.fetch;
+  window.fetch = (input, init) => {
+    if (typeof input === "string") return originalFetch(rewrite(input), init);
+    if (input instanceof Request) return originalFetch(new Request(rewrite(input.url), input), init);
+    return originalFetch(input, init);
+  };
+  const originalOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+    return originalOpen.call(this, method, rewrite(url), ...rest);
+  };
+})();
+</script>
+"""
+        if "</head>" in text:
+            text = text.replace("</head>", f"{shim}</head>", 1)
+        else:
+            text = f"{shim}{text}"
+        return text.encode(encoding)
+
+    def _rewrite_css(self, body: bytes, encoding: str) -> bytes:
+        text = body.decode(encoding, errors="replace")
+        text = text.replace('url("/', 'url("/api/admin/suwayomi/')
+        text = text.replace("url('/", "url('/api/admin/suwayomi/")
+        text = re.sub(r"url\(/(?!/|api/admin/suwayomi/)", "url(/api/admin/suwayomi/", text)
+        return text.encode(encoding)
 
 
 def get_suwayomi_client(settings: Settings = Depends(get_settings)) -> SuwayomiClient:

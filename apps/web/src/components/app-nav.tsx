@@ -8,6 +8,7 @@ const navItems = [
   { href: "/sources", label: "Fontes" },
   { href: "/search", label: "Buscar" },
   { href: "/library", label: "Biblioteca" },
+  { href: "/admin/suwayomi", label: "Admin Suwayomi" },
 ];
 
 export function AppNav() {
