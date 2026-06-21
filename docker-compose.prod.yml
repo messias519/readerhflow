@@ -1,0 +1,99 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: runner
+    container_name: panelflow-web
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-PanelFlow}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://reader.hflow.top}
+      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:8000}
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - panelflow_internal
+      - npm_default
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: panelflow-api
+    environment:
+      STORAGE_PATH: ${STORAGE_PATH:-/data/library}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://panelflow:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Portainer}@postgres:5432/panelflow}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      SUWAYOMI_URL: ${SUWAYOMI_URL:-http://suwayomi:4567}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://reader.hflow.top}
+    volumes:
+      - ${PANELFLOW_LIBRARY_HOST_PATH:-/mnt/gdrive/panelflow/library}:/data/library
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      suwayomi:
+        condition: service_started
+    networks:
+      - panelflow_internal
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: panelflow-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-panelflow}
+      POSTGRES_USER: ${POSTGRES_USER:-panelflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Portainer}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - panelflow_internal
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: panelflow-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - panelflow_internal
+    restart: unless-stopped
+
+  suwayomi:
+    image: ghcr.io/suwayomi/tachidesk:stable
+    container_name: panelflow-suwayomi
+    environment:
+      TZ: ${TZ:-America/Sao_Paulo}
+    volumes:
+      - suwayomi_data:/home/suwayomi/.local/share/Tachidesk
+    networks:
+      - panelflow_internal
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  suwayomi_data:
+
+networks:
+  panelflow_internal:
+    name: panelflow_internal
+    driver: bridge
+  npm_default:
+    external: true
