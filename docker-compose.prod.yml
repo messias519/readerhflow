@@ -86,6 +86,8 @@ services:
       TZ: ${TZ:-America/Sao_Paulo}
     volumes:
       - suwayomi_data:/home/suwayomi/.local/share/Tachidesk
+    ports:
+      - "127.0.0.1:4567:4567"
     networks:
       - panelflow_internal
     restart: unless-stopped
