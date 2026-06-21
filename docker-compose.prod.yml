@@ -30,7 +30,7 @@ services:
       SUWAYOMI_URL: ${SUWAYOMI_URL:-http://suwayomi:4567}
       CORS_ORIGINS: ${CORS_ORIGINS:-https://reader.hflow.top}
     volumes:
-      - /mnt/gdrive/panelflow/library:/data/library
+      - /mnt/panelflow-gdrive/library:/data/library
     depends_on:
       postgres:
         condition: service_healthy
