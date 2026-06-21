@@ -1,5 +1,5 @@
 import { StatusCard } from "@/components/status-card";
-import { LogoutButton } from "@/components/logout-button";
+import { AppShell } from "@/components/app-shell";
 import { requireCurrentUser } from "@/lib/auth";
 import { fetchApiStatus } from "@/lib/status";
 
@@ -42,24 +42,8 @@ export default async function Home() {
   }).format(new Date(status.checked_at));
 
   return (
-    <main className="min-h-screen px-5 py-6 sm:px-8 lg:px-10">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-        <header className="flex flex-col gap-5 border-b border-white/10 pb-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-signal-cyan">reader.hflow</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-normal text-white sm:text-4xl">PanelFlow</h1>
-          </div>
-          <div className="flex flex-col gap-3 sm:items-end">
-            <div className="rounded-lg border border-white/10 bg-ink-850/80 px-4 py-3 text-sm text-slate-300">
-              Infrastructure status
-            </div>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-400">
-              <span className="max-w-full break-all">{user.email}</span>
-              <LogoutButton />
-            </div>
-          </div>
-        </header>
-
+    <AppShell title="Dashboard" user={user}>
+      <div className="flex flex-col gap-8">
         <section className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
           <div className="rounded-lg border border-white/10 bg-ink-850/75 p-6 shadow-panel">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -70,8 +54,9 @@ export default async function Home() {
               <p className="text-sm text-slate-400">Checked at {checkedAt} UTC</p>
             </div>
             <p className="mt-5 max-w-2xl text-sm leading-6 text-slate-300">
-              Phase 2 adds private admin authentication around the infrastructure dashboard. Uploads, readers,
-              source browsing, PDF, CBZ and offline PWA behavior are intentionally not implemented yet.
+              Phase 3 adds the first private bridge to Suwayomi: source browsing, source search and a saved
+              PanelFlow library. Readers, uploads, PDF, CBZ and offline PWA behavior are intentionally not
+              implemented yet.
             </p>
           </div>
 
@@ -105,6 +90,6 @@ export default async function Home() {
           ))}
         </section>
       </div>
-    </main>
+    </AppShell>
   );
 }

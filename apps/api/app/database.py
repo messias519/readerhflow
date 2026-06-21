@@ -25,5 +25,27 @@ async def init_database(settings: Settings) -> None:
             );
             """
         )
+        await connection.execute(
+            """
+            create table if not exists library_items (
+                id bigserial primary key,
+                user_id bigint not null references users(id) on delete cascade,
+                title text not null,
+                subtitle text,
+                item_type text not null default 'unknown',
+                source_type text not null,
+                source_id text not null,
+                external_id text not null,
+                external_url text,
+                cover_url text,
+                description text,
+                status text,
+                created_at timestamptz not null default now(),
+                updated_at timestamptz not null default now(),
+                constraint library_items_user_external_unique
+                    unique (user_id, source_type, source_id, external_id)
+            );
+            """
+        )
     finally:
         await connection.close()

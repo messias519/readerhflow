@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import (
@@ -19,7 +19,23 @@ from app.auth import (
 )
 from app.config import get_settings
 from app.database import init_database
+from app.library import (
+    ExternalLibraryItemCreate,
+    LibraryItem,
+    add_external_library_item,
+    get_library_item,
+    list_library_items,
+)
 from app.status import check_database, check_redis, check_storage, check_suwayomi
+from app.suwayomi import (
+    SearchResponse,
+    SourceDetail,
+    SourceSummary,
+    SuwayomiClient,
+    SuwayomiClientError,
+    get_suwayomi_client,
+    suwayomi_http_error,
+)
 
 settings = get_settings()
 
@@ -104,8 +120,97 @@ async def api_status() -> dict[str, Any]:
 
     return {
         "app": "PanelFlow",
-        "environment": "phase-2",
+        "environment": "phase-3",
         "status": overall,
         "checked_at": datetime.now(UTC).isoformat(),
         "services": services,
     }
+
+
+@app.get("/api/sources", response_model=list[SourceSummary])
+async def sources(
+    _current_user: Annotated[User, Depends(get_current_user)],
+    client: Annotated[SuwayomiClient, Depends(get_suwayomi_client)],
+) -> list[SourceSummary]:
+    try:
+        return await client.list_sources()
+    except SuwayomiClientError as exc:
+        raise suwayomi_http_error(exc) from exc
+
+
+@app.get("/api/sources/{source_id}", response_model=SourceDetail)
+async def source_detail(
+    source_id: str,
+    _current_user: Annotated[User, Depends(get_current_user)],
+    client: Annotated[SuwayomiClient, Depends(get_suwayomi_client)],
+) -> SourceDetail:
+    try:
+        return await client.get_source(source_id)
+    except SuwayomiClientError as exc:
+        raise suwayomi_http_error(exc) from exc
+
+
+@app.get("/api/search", response_model=SearchResponse)
+async def search(
+    current_user: Annotated[User, Depends(get_current_user)],
+    client: Annotated[SuwayomiClient, Depends(get_suwayomi_client)],
+    source_id: str | None = None,
+    query: str | None = None,
+    page: int = 1,
+) -> SearchResponse:
+    del current_user
+    if not source_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "source_id_required", "message": "Choose a source before searching."},
+        )
+    if not query or not query.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "query_required", "message": "Enter a search term."},
+        )
+
+    try:
+        return await client.search(source_id, query.strip(), page)
+    except SuwayomiClientError as exc:
+        raise suwayomi_http_error(exc) from exc
+
+
+@app.post("/api/library/external", response_model=LibraryItem)
+async def add_external_to_library(
+    payload: ExternalLibraryItemCreate,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> LibraryItem:
+    return await add_external_library_item(settings, current_user.id, payload)
+
+
+@app.get("/api/library", response_model=list[LibraryItem])
+async def library(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> list[LibraryItem]:
+    return await list_library_items(settings, current_user.id)
+
+
+@app.get("/api/library/{item_id}", response_model=LibraryItem)
+async def library_detail(
+    item_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> LibraryItem:
+    item = await get_library_item(settings, current_user.id, item_id)
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Library item not found")
+    return item
+
+
+@app.get("/api/suwayomi/image")
+async def suwayomi_image(
+    _current_user: Annotated[User, Depends(get_current_user)],
+    client: Annotated[SuwayomiClient, Depends(get_suwayomi_client)],
+    image_url: Annotated[str, Query(..., min_length=1, alias="url")],
+) -> Response:
+    del _current_user
+    try:
+        content, content_type = await client.fetch_internal_image(image_url)
+    except SuwayomiClientError as exc:
+        raise suwayomi_http_error(exc) from exc
+    return Response(content=content, media_type=content_type)

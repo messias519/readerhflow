@@ -13,6 +13,7 @@ Implemented phases:
 - Production Docker Compose for Portainer + Nginx Proxy Manager
 - Storage writability check for `/data/library`
 - Private admin authentication with JWT and password hashing
+- Initial Suwayomi integration for sources, search and saved library items
 
 The production domain is `reader.hflow.top`.
 
@@ -26,6 +27,12 @@ Implemented API endpoints:
 - `POST /api/auth/login`
 - `GET /api/auth/me`
 - `POST /api/auth/logout`
+- `GET /api/sources`
+- `GET /api/sources/{source_id}`
+- `GET /api/search?source_id=...&query=...`
+- `POST /api/library/external`
+- `GET /api/library`
+- `GET /api/library/{item_id}`
 
 The web dashboard shows:
 
@@ -36,12 +43,13 @@ The web dashboard shows:
 - storage status
 - logged-in admin email
 - logout action
+- source list
+- source search
+- user library
 
 Not implemented yet:
 
 - public registration
-- manga search
-- source listing
 - chapter reader
 - upload system
 - PDF reader
@@ -81,6 +89,14 @@ http://localhost:8000/api/suwayomi/status
 
 Local Compose exposes only the web and API ports by default. PostgreSQL, Redis and Suwayomi stay on the internal Docker network and can be inspected with `docker compose exec`.
 
+## Suwayomi Integration
+
+PanelFlow uses Suwayomi as an internal manga/manhwa source engine. The browser never talks to Suwayomi directly; Next.js calls the PanelFlow API, and the API calls Suwayomi through `SUWAYOMI_URL` inside Docker.
+
+Source browsing and search use Suwayomi's GraphQL API. Results added to the PanelFlow library are stored in PostgreSQL with `source_type=external_suwayomi`, and duplicate saves are prevented per user by `source_id + external_id`.
+
+See [Suwayomi integration](docs/SUWAYOMI_INTEGRATION.md).
+
 ## Production Deployment
 
 Production uses `docker-compose.prod.yml`.
@@ -98,6 +114,7 @@ See:
 - [Portainer deployment](docs/DEPLOY_PORTAINER.md)
 - [Nginx Proxy Manager](docs/NGINX_PROXY_MANAGER.md)
 - [Google Drive storage](docs/GOOGLE_DRIVE_STORAGE.md)
+- [Suwayomi integration](docs/SUWAYOMI_INTEGRATION.md)
 - [Roadmap](docs/ROADMAP.md)
 
 ## Environment

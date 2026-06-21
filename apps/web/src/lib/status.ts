@@ -26,7 +26,7 @@ export type ApiStatus = {
 
 const fallbackStatus: ApiStatus = {
   app: "PanelFlow",
-  environment: "phase-2",
+  environment: "phase-3",
   status: "error",
   checked_at: new Date().toISOString(),
   services: {

@@ -15,4 +15,3 @@ data/library/*
 !data/library/.gitkeep
 
 output/
-docs/
