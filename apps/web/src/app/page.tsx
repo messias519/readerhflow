@@ -1,4 +1,6 @@
 import { StatusCard } from "@/components/status-card";
+import { LogoutButton } from "@/components/logout-button";
+import { requireCurrentUser } from "@/lib/auth";
 import { fetchApiStatus } from "@/lib/status";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +34,7 @@ const services = [
 ] as const;
 
 export default async function Home() {
-  const status = await fetchApiStatus();
+  const [user, status] = await Promise.all([requireCurrentUser(), fetchApiStatus()]);
   const checkedAt = new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
     timeStyle: "medium",
@@ -47,8 +49,14 @@ export default async function Home() {
             <p className="text-sm font-medium text-signal-cyan">reader.hflow</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-normal text-white sm:text-4xl">PanelFlow</h1>
           </div>
-          <div className="rounded-lg border border-white/10 bg-ink-850/80 px-4 py-3 text-sm text-slate-300">
-            Infrastructure status
+          <div className="flex flex-col gap-3 sm:items-end">
+            <div className="rounded-lg border border-white/10 bg-ink-850/80 px-4 py-3 text-sm text-slate-300">
+              Infrastructure status
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-400">
+              <span className="max-w-full break-all">{user.email}</span>
+              <LogoutButton />
+            </div>
           </div>
         </header>
 
@@ -62,8 +70,8 @@ export default async function Home() {
               <p className="text-sm text-slate-400">Checked at {checkedAt} UTC</p>
             </div>
             <p className="mt-5 max-w-2xl text-sm leading-6 text-slate-300">
-              Phase 1 is limited to infrastructure visibility. Auth, uploads, readers, source browsing, PDF, CBZ
-              and offline PWA behavior are intentionally not implemented yet.
+              Phase 2 adds private admin authentication around the infrastructure dashboard. Uploads, readers,
+              source browsing, PDF, CBZ and offline PWA behavior are intentionally not implemented yet.
             </p>
           </div>
 

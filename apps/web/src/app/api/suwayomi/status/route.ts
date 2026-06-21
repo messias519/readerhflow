@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { apiBaseUrl } from "@/lib/status";
+import { apiBaseUrl } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 

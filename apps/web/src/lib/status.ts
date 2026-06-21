@@ -1,3 +1,5 @@
+import { apiBaseUrl } from "@/lib/api";
+
 export type ServiceStatusValue = "ok" | "degraded" | "error" | "unknown";
 
 export type ServiceStatus = {
@@ -24,7 +26,7 @@ export type ApiStatus = {
 
 const fallbackStatus: ApiStatus = {
   app: "PanelFlow",
-  environment: "phase-1",
+  environment: "phase-2",
   status: "error",
   checked_at: new Date().toISOString(),
   services: {
@@ -39,10 +41,6 @@ const fallbackStatus: ApiStatus = {
     storage: { name: "storage", status: "unknown" },
   },
 };
-
-export function apiBaseUrl() {
-  return process.env.API_INTERNAL_URL ?? "http://api:8000";
-}
 
 export async function fetchApiStatus(): Promise<ApiStatus> {
   try {

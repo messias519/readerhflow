@@ -30,6 +30,10 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       SUWAYOMI_URL: ${SUWAYOMI_URL:-http://suwayomi:4567}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_ACCESS_TOKEN_MINUTES: ${JWT_ACCESS_TOKEN_MINUTES:-720}
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:

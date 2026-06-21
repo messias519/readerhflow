@@ -17,6 +17,11 @@ class Settings(BaseSettings):
         validation_alias="SUWAYOMI_URL",
     )
     cors_origins: str = Field(default="http://localhost:3000", validation_alias="CORS_ORIGINS")
+    admin_email: str = Field(validation_alias="ADMIN_EMAIL")
+    admin_password: str = Field(validation_alias="ADMIN_PASSWORD")
+    jwt_secret: str = Field(validation_alias="JWT_SECRET")
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_minutes: int = Field(default=60 * 12, validation_alias="JWT_ACCESS_TOKEN_MINUTES")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

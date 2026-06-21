@@ -2,7 +2,7 @@
 
 PanelFlow is a private, self-hosted web reader skeleton for manga, manhwa, webtoons, comics, PDFs, articles and CBZ/ZIP files.
 
-Phase 1 only implements infrastructure:
+Implemented phases:
 
 - Next.js + TypeScript + Tailwind web dashboard
 - FastAPI backend API
@@ -12,16 +12,20 @@ Phase 1 only implements infrastructure:
 - Local Docker Compose
 - Production Docker Compose for Portainer + Nginx Proxy Manager
 - Storage writability check for `/data/library`
+- Private admin authentication with JWT and password hashing
 
 The production domain is `reader.hflow.top`.
 
-## Phase 1 Scope
+## Current Scope
 
 Implemented API endpoints:
 
 - `GET /health`
 - `GET /api/status`
 - `GET /api/suwayomi/status`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+- `POST /api/auth/logout`
 
 The web dashboard shows:
 
@@ -30,10 +34,11 @@ The web dashboard shows:
 - Redis status
 - Suwayomi status
 - storage status
+- logged-in admin email
+- logout action
 
-Not implemented in Phase 1:
+Not implemented yet:
 
-- authentication
 - public registration
 - manga search
 - source listing
@@ -102,8 +107,21 @@ Never commit `.env`.
 Required production values:
 
 - `POSTGRES_PASSWORD`
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD`
+- `JWT_SECRET`
 - `PANELFLOW_LIBRARY_HOST_PATH`
 - `NEXT_PUBLIC_SITE_URL=https://reader.hflow.top`
 - `API_INTERNAL_URL=http://api:8000`
 - `SUWAYOMI_URL=http://suwayomi:4567`
+
+`ADMIN_PASSWORD` is only used to create the initial admin if that email does not already exist. Existing admin passwords are not overwritten automatically.
+
+## Auth Test Command
+
+With the Docker stack running:
+
+```powershell
+docker compose exec api pytest
+```
 
